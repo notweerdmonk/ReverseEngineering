@@ -3,7 +3,7 @@
 
 Before we plunge into lines of assembly code here is some background. This reverse engineering task is part of a course offered at CMU (http://csapp.cs.cmu.edu/public/labs.html). Its appropriately named Bomb Lab (:P) as the task provides a 'binary bomb' to students. This binary requires six strings from the user which are read either from the standard input or a text file. Providing an incorrect string will set off the bomb! The students need to find the six strings to successfully defuse the bomb.
 
-I stumbled upon this on the internet few years back when I was beginning to learn reversing binaries. Many thanks to _xuzhezhaozhao_ (https://github.com/xuzhezhaozhao/CSAPP-Labs/tree/master/bomb%20lab) for sharing the binary and lab writeup with the less fortunate ones. You will be provided with a tar file containing the binary.
+I stumbled upon this on the internet few years back when I was beginning to learn reversing binaries. Many thanks to _xuzhezhaozhao_ (https://github.com/xuzhezhaozhao/CSAPP-Labs/tree/master/bomb%20lab) for sharing the binary and lab writeup. You will be provided with a tar file containing the binary.
 
 Now armed with linux, bash and the ever amazing gdb, we set out to defuse this binary bomb.
 
@@ -13,25 +13,115 @@ bomb: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically link
 ```
 The binary is a 32-bit ELF. You need to setup a 32 bit environment. Easiest way is to use a virtual machine emulator/hypervisor like qemu, VirtualBox, vagrant or whatever other virtual machine makes feel sane. Next you need a 32-bit Linux distro (you can also do this on a Windows or Mac machine, look around the internet). Make sure to have atleast the common Unix tools like file, strings, gdb, etc installed before you proceed. This task helped me learn about gdb in an entirely new light.
 
-Load the binary with gdb and set a breakpoint at `phase_1`.
+Load the binary with gdb and set a breakpoint at `main`.
 
 ```assembly
 $ gdb -q bomb
-(gdb) b phase_1
+(gdb) b main
+(gdb) r
 ```
+gdb hits this breakpoint and halts. Disassemble the `main` function.
+
+```assembly
+(gdb) disas main
+Dump of assembler code for function main:
+   0x080489b0 <+0>:    push   ebp
+   0x080489b1 <+1>:    mov    ebp,esp
+   0x080489b3 <+3>:    sub    esp,0x14
+   0x080489b6 <+6>:    push   ebx
+   ; prologue ends
+   ; load argc into eax
+   0x080489b7 <+7>:    mov    eax,DWORD PTR [ebp+0x8]
+   ; load argv[0] into ebx
+   0x080489ba <+10>:   mov    ebx,DWORD PTR [ebp+0xc]
+   0x080489bd <+13>:   cmp    eax,0x1
+   0x080489c0 <+16>:   jne    0x80489d0 <main+32>
+   ; if argc == 1
+   ; program will read input from command line
+   0x080489c2 <+18>:   mov    eax,ds:0x804b648
+   0x080489c7 <+23>:   mov    ds:0x804b664,eax
+   0x080489cc <+28>:   jmp    0x8048a30 <main+128>
+   0x080489ce <+30>:   mov    esi,esi
+   0x080489d0 <+32>:   cmp    eax,0x2
+   0x080489d3 <+35>:   jne    0x8048a10 <main+96>
+   ; else if argc == 2
+   ; open file provided as argument as read-only and read input from it
+   0x080489d5 <+37>:   add    esp,0xfffffff8
+   0x080489d8 <+40>:   push   0x8049620
+   0x080489dd <+45>:   mov    eax,DWORD PTR [ebx+0x4]
+   0x080489e0 <+48>:   push   eax
+   0x080489e1 <+49>:   call   0x8048880 <fopen@plt>
+   0x080489e6 <+54>:   mov    ds:0x804b664,eax
+   0x080489eb <+59>:   add    esp,0x10
+   ; printf error message and exit of fopen fails
+   0x080489ee <+62>:   test   eax,eax
+   0x080489f0 <+64>:   jne    0x8048a30 <main+128>
+   0x080489f2 <+66>:   add    esp,0xfffffffc
+   0x080489f5 <+69>:   mov    eax,DWORD PTR [ebx+0x4]
+   0x080489f8 <+72>:   push   eax
+   0x080489f9 <+73>:   mov    eax,DWORD PTR [ebx]
+   0x080489fb <+75>:   push   eax
+   0x080489fc <+76>:   push   0x8049622
+   0x08048a01 <+81>:   call   0x8048810 <printf@plt>
+   0x08048a06 <+86>:   add    esp,0xfffffff4
+   0x08048a09 <+89>:   push   0x8
+   0x08048a0b <+91>:   call   0x8048850 <exit@plt>
+   ; else print usage and exit
+   0x08048a10 <+96>:   add    esp,0xfffffff8
+   0x08048a13 <+99>:   mov    eax,DWORD PTR [ebx]
+   0x08048a15 <+101>:  push   eax
+   0x08048a16 <+102>:  push   0x804963f
+   0x08048a1b <+107>:  call   0x8048810 <printf@plt>
+   0x08048a20 <+112>:  add    esp,0xfffffff4
+   0x08048a23 <+115>:  push   0x8
+   0x08048a25 <+117>:  call   0x8048850 <exit@plt>
+   0x08048a2a <+122>:  lea    esi,[esi+0x0]
+   ; initialize the bomb
+   0x08048a30 <+128>:  call   0x8049160 <initialize_bomb>
+   0x08048a35 <+133>:  add    esp,0xfffffff4
+   0x08048a38 <+136>:  push   0x8049660
+   0x08048a3d <+141>:  call   0x8048810 <printf@plt>
+   0x08048a42 <+146>:  add    esp,0xfffffff4
+   0x08048a45 <+149>:  push   0x80496a0
+   0x08048a4a <+154>:  call   0x8048810 <printf@plt>
+   0x08048a4f <+159>:  add    esp,0x20
+   0x08048a52 <+162>:  call   0x80491fc <read_line>
+   0x08048a57 <+167>:  add    esp,0xfffffff4
+   0x08048a5a <+170>:  push   eax
+   0x08048a5b <+171>:  call   0x8048b20 <phase_1>
+
+```
+The function `initialize_bomb` installs a handler for SIGINT signal. We need not analyze this part of the code.
+
+```assembly
+(gdb) disas initialize_bomb
+Dump of assembler code for function initialize_bomb:
+   0x08049160 <+0>:  push   ebp
+   0x08049161 <+1>:  mov    ebp,esp
+   0x08049163 <+3>:  sub    esp,0x8
+   0x08049166 <+6>:  add    esp,0xfffffff8
+   0x08049169 <+9>:  push   0x8048f50
+   0x0804916e <+14>:  push   0x2
+   0x08049170 <+16>:  call   0x8048770 <signal@plt>
+   0x08049175 <+21>:  mov    esp,ebp
+   0x08049177 <+23>:  pop    ebp
+   0x08049178 <+24>:  ret
+```
+The program reads one line either from `stdin` or from the file we provide and passes this string to a function `phase_1`. There are six such functions which represent the six phases we need to successfully pass inorder to defuse the bomb. Let's start with the first phase.
+
 ## phase 1
 
-Now let us disassemble `phase_1`.
+Disassemble `phase_1` with gdb.
 
 ```assembly
 (gdb) disas phase_1
 Dump of assembler code for function phase_1:
-   0x08048b20 <+0>:	  push   ebp
-   0x08048b21 <+1>:	  mov    ebp,esp
-   0x08048b23 <+3>:	  sub    esp,0x8
+   0x08048b20 <+0>:  push   ebp
+   0x08048b21 <+1>:  mov    ebp,esp
+   0x08048b23 <+3>:  sub    esp,0x8
    ; load arg into eax
-   0x08048b26 <+6>:	  mov    eax,DWORD PTR [ebp+0x8]
-   0x08048b29 <+9>:   add    esp,0xfffffff8
+   0x08048b26 <+6>:  mov    eax,DWORD PTR [ebp+0x8]
+   0x08048b29 <+9>:  add    esp,0xfffffff8
    ; push string to compare our input against
    0x08048b2c <+12>:  push   0x80497c0
    ; push input string
@@ -51,53 +141,53 @@ It is not entirely necessary to analyze `strings_not_equal` at this point. If yo
 ```assembly
 Dump of assembler code for function strings_not_equal:
 ...
-   0x08049055 <+37>:	je     0x8049060 <strings_not_equal+48>
+   0x08049055 <+37>:  je     0x8049060 <strings_not_equal+48>
    ; return 1 if strings do not match exactly
-   0x08049057 <+39>:	mov    eax,0x1
-   0x0804905c <+44>:	jmp    0x804907f <strings_not_equal+79>
-   0x0804905e <+46>:	mov    esi,esi
-   0x08049060 <+48>:	mov    edx,esi
-   0x08049062 <+50>:	mov    ecx,edi
-   0x08049064 <+52>:	cmp    BYTE PTR [edx],0x0
-   0x08049067 <+55>:	je     0x804907d <strings_not_equal+77>
-   0x08049069 <+57>:	lea    esi,[esi+eiz*1+0x0]
-   0x08049070 <+64>:	mov    al,BYTE PTR [edx]
-   0x08049072 <+66>:	cmp    al,BYTE PTR [ecx]
-   0x08049074 <+68>:	jne    0x8049057 <strings_not_equal+39>
-   0x08049076 <+70>:	inc    edx
-   0x08049077 <+71>:	inc    ecx
+   0x08049057 <+39>:  mov    eax,0x1
+   0x0804905c <+44>:  jmp    0x804907f <strings_not_equal+79>
+   0x0804905e <+46>:  mov    esi,esi
+   0x08049060 <+48>:  mov    edx,esi
+   0x08049062 <+50>:  mov    ecx,edi
+   0x08049064 <+52>:  cmp    BYTE PTR [edx],0x0
+   0x08049067 <+55>:  je     0x804907d <strings_not_equal+77>
+   0x08049069 <+57>:  lea    esi,[esi+eiz*1+0x0]
+   0x08049070 <+64>:  mov    al,BYTE PTR [edx]
+   0x08049072 <+66>:  cmp    al,BYTE PTR [ecx]
+   0x08049074 <+68>:  jne    0x8049057 <strings_not_equal+39>
+   0x08049076 <+70>:  inc    edx
+   0x08049077 <+71>:  inc    ecx
    ; keep checking till end of input string
-   0x08049078 <+72>:	cmp    BYTE PTR [edx],0x0
-   0x0804907b <+75>:	jne    0x8049070 <strings_not_equal+64>
-   0x0804907d <+77>:	xor    eax,eax
-   0x0804907f <+79>:	lea    esp,[ebp-0x18]
-   0x08049082 <+82>:	pop    ebx
-   0x08049083 <+83>:	pop    esi
-   0x08049084 <+84>:	pop    edi
-   0x08049085 <+85>:	mov    esp,ebp
-   0x08049087 <+87>:	pop    ebp
-   0x08049088 <+88>:	ret
+   0x08049078 <+72>:  cmp    BYTE PTR [edx],0x0
+   0x0804907b <+75>:  jne    0x8049070 <strings_not_equal+64>
+   0x0804907d <+77>:  xor    eax,eax
+   0x0804907f <+79>:  lea    esp,[ebp-0x18]
+   0x08049082 <+82>:  pop    ebx
+   0x08049083 <+83>:  pop    esi
+   0x08049084 <+84>:  pop    edi
+   0x08049085 <+85>:  mov    esp,ebp
+   0x08049087 <+87>:  pop    ebp
+   0x08049088 <+88>:  ret
 ```
 Looking at the address of the second argument we get the string against which our input will be compared. This is in fact the input for `phase_1`.
 
 ```assembly
 (gdb) x/s 0x80497c0
-0x80497c0:	 "Public speaking is very easy."
+0x80497c0:   "Public speaking is very easy."
 ```
 ## phase 2
 
-Let us proceed on to `phase_2`.
+Okay, that was somewhat straightforward! Let's proceed to `phase_2`.
 
 Analyzing `phase_2` we find that a function `read_six_numbers` is called with our input string and the address of an array to hold six `int` variables. This function simply reads six integers from the input string and stores then in an array, nothing fancy! The input string for `phase_2` should contain six space separated numbers.
 ```assembly
 (gdb) disas phase_2
 Dump of assembler code for function phase_2:
-   0x08048b48 <+0>:	  push   ebp
-   0x08048b49 <+1>:	  mov    ebp,esp
-   0x08048b4b <+3>:	  sub    esp,0x20
-   0x08048b4e <+6>:	  push   esi
-   0x08048b4f <+7>:	  push   ebx
-   0x08048b50 <+8>:	  mov    edx,DWORD PTR [ebp+0x8]
+   0x08048b48 <+0>:  push   ebp
+   0x08048b49 <+1>:  mov    ebp,esp
+   0x08048b4b <+3>:  sub    esp,0x20
+   0x08048b4e <+6>:  push   esi
+   0x08048b4f <+7>:  push   ebx
+   0x08048b50 <+8>:  mov    edx,DWORD PTR [ebp+0x8]
    0x08048b53 <+11>:  add    esp,0xfffffff8
    ; load address of array of 6 int into eax
    0x08048b56 <+14>:  lea    eax,[ebp-0x18]
@@ -143,117 +233,132 @@ Starting with 1, six numbers in the sequence are 1, 2, 6, 24, 120, 720.
 
 ## phase 3
 
+Two ```int``` and a ```char``` are extracted from the input string. Let's use literals ```a``` and ```b``` for the two integers, and ```c``` for the character. ```a``` is then used in a switch block consisting of eight cases for each value starting with 0 till 7. The case blocks load a 8-bit constant value into ```bl``` (ebx) which will be compared against ```c```. And then there are checks comparing ```b``` with constant integer values.
+
+We need to set ```a``` to any number from 0 to 7, but ```c``` and ```b``` shoulde be set such that the checks in corresponding case blocks pass. Possible values are:
+
+```
+0 q 777
+1 b 214
+2 b 755
+3 k 251
+4 o 160
+5 t 458
+6 v 780
+7 { 524
+```
+
 ```assembly
 (gdb) disas phase_3
 Dump of assembler code for function phase_3:
    ; load arg into edx
-   0x08048b9f <+7>:	  mov    edx,DWORD PTR [ebp+0x8]
-   0x08048ba2 <+10>:	add    esp,0xfffffff4
+   0x08048b9f <+7>:  mov    edx,DWORD PTR [ebp+0x8]
+   0x08048ba2 <+10>:  add    esp,0xfffffff4
    ; int b
-   0x08048ba5 <+13>:	lea    eax,[ebp-0x4]
-   0x08048ba8 <+16>:	push   eax
+   0x08048ba5 <+13>:  lea    eax,[ebp-0x4]
+   0x08048ba8 <+16>:  push   eax
    ; char c
-   0x08048ba9 <+17>:	lea    eax,[ebp-0x5]
-   0x08048bac <+20>:	push   eax
+   0x08048ba9 <+17>:  lea    eax,[ebp-0x5]
+   0x08048bac <+20>:  push   eax
    ; int a
-   0x08048bad <+21>:	lea    eax,[ebp-0xc]
-   0x08048bb0 <+24>:	push   eax
-   0x08048bb1 <+25>:	push   0x80497de
-   0x08048bb6 <+30>:	push   edx
+   0x08048bad <+21>:  lea    eax,[ebp-0xc]
+   0x08048bb0 <+24>:  push   eax
+   0x08048bb1 <+25>:  push   0x80497de
+   0x08048bb6 <+30>:  push   edx
    ; sscanf(input_str, "%d %c %d", &a, &c, &b)
-   0x08048bb7 <+31>:	call   0x8048860 <sscanf@plt>
-   0x08048bbc <+36>:	add    esp,0x20
-   0x08048bbf <+39>:	cmp    eax,0x2
-   0x08048bc2 <+42>:	jg     0x8048bc9 <phase_3+49>
-   0x08048bc4 <+44>:	call   0x80494fc <explode_bomb>
+   0x08048bb7 <+31>:  call   0x8048860 <sscanf@plt>
+   0x08048bbc <+36>:  add    esp,0x20
+   0x08048bbf <+39>:  cmp    eax,0x2
+   0x08048bc2 <+42>:  jg     0x8048bc9 <phase_3+49>
+   0x08048bc4 <+44>:  call   0x80494fc <explode_bomb>
    ; a < 7
-   0x08048bc9 <+49>:	cmp    DWORD PTR [ebp-0xc],0x7
-   0x08048bcd <+53>:	ja     0x8048c88 <phase_3+240>
+   0x08048bc9 <+49>:  cmp    DWORD PTR [ebp-0xc],0x7
+   0x08048bcd <+53>:  ja     0x8048c88 <phase_3+240>
    ; eax = a
-   0x08048bd3 <+59>:	mov    eax,DWORD PTR [ebp-0xc]
+   0x08048bd3 <+59>:  mov    eax,DWORD PTR [ebp-0xc]
    ; switch(a)
-   0x08048bd6 <+62>:	jmp    DWORD PTR [eax*6+0x80497e8]
-   0x08048bdd <+69>:	lea    esi,[esi+0x0]
+   0x08048bd6 <+62>:  jmp    DWORD PTR [eax*6+0x80497e8]
+   0x08048bdd <+69>:  lea    esi,[esi+0x0]
    ; case 0: bl = 'q'
-   0x08048be0 <+72>:	mov    bl,0x71
+   0x08048be0 <+72>:  mov    bl,0x71
    ; if (b == 777)
-   0x08048be2 <+74>:	cmp    DWORD PTR [ebp-0x4],0x309
-   0x08048be9 <+81>:	je     0x8048c8f <phase_3+247>
-   0x08048bef <+87>:	call   0x80494fc <explode_bomb>
-   0x08048bf4 <+92>:	jmp    0x8048c8f <phase_3+247>
-   0x08048bf9 <+97>:	lea    esi,[esi+eiz*1+0x0]
+   0x08048be2 <+74>:  cmp    DWORD PTR [ebp-0x4],0x309
+   0x08048be9 <+81>:  je     0x8048c8f <phase_3+247>
+   0x08048bef <+87>:  call   0x80494fc <explode_bomb>
+   0x08048bf4 <+92>:  jmp    0x8048c8f <phase_3+247>
+   0x08048bf9 <+97>:  lea    esi,[esi+eiz*1+0x0]
    ; case 1: bl = 'b'
-   0x08048c00 <+104>:	mov    bl,0x62
+   0x08048c00 <+104>:  mov    bl,0x62
    ; if (b == 214)
-   0x08048c02 <+106>:	cmp    DWORD PTR [ebp-0x4],0xd6
-   0x08048c09 <+113>:	je     0x8048c8f <phase_3+247>
-   0x08048c0f <+119>:	call   0x80494fc <explode_bomb>
-   0x08048c14 <+124>:	jmp    0x8048c8f <phase_3+247>
+   0x08048c02 <+106>:  cmp    DWORD PTR [ebp-0x4],0xd6
+   0x08048c09 <+113>:  je     0x8048c8f <phase_3+247>
+   0x08048c0f <+119>:  call   0x80494fc <explode_bomb>
+   0x08048c14 <+124>:  jmp    0x8048c8f <phase_3+247>
    ; case 2: bl = 'b'
-   0x08048c16 <+126>:	mov    bl,0x62
+   0x08048c16 <+126>:  mov    bl,0x62
    ; if (b == 755)
-   0x08048c18 <+128>:	cmp    DWORD PTR [ebp-0x4],0x2f3
-   0x08048c1f <+135>:	je     0x8048c8f <phase_3+247>
-   0x08048c21 <+137>:	call   0x80494fc <explode_bomb>
-   0x08048c26 <+142>:	jmp    0x8048c8f <phase_3+247>
+   0x08048c18 <+128>:  cmp    DWORD PTR [ebp-0x4],0x2f3
+   0x08048c1f <+135>:  je     0x8048c8f <phase_3+247>
+   0x08048c21 <+137>:  call   0x80494fc <explode_bomb>
+   0x08048c26 <+142>:  jmp    0x8048c8f <phase_3+247>
    ; case 3: bl = 'k'
-   0x08048c28 <+144>:	mov    bl,0x6b
+   0x08048c28 <+144>:  mov    bl,0x6b
    ; if (b == 251)
-   0x08048c2a <+146>:	cmp    DWORD PTR [ebp-0x4],0xfb
-   0x08048c31 <+153>:	je     0x8048c8f <phase_3+247>
-   0x08048c33 <+155>:	call   0x80494fc <explode_bomb>
-   0x08048c38 <+160>:	jmp    0x8048c8f <phase_3+247>
-   0x08048c3a <+162>:	lea    esi,[esi+0x0]
+   0x08048c2a <+146>:  cmp    DWORD PTR [ebp-0x4],0xfb
+   0x08048c31 <+153>:  je     0x8048c8f <phase_3+247>
+   0x08048c33 <+155>:  call   0x80494fc <explode_bomb>
+   0x08048c38 <+160>:  jmp    0x8048c8f <phase_3+247>
+   0x08048c3a <+162>:  lea    esi,[esi+0x0]
    ; case 4: bl = 'o'
-   0x08048c40 <+168>:	mov    bl,0x6f
+   0x08048c40 <+168>:  mov    bl,0x6f
    ; if (b == 160)
-   0x08048c42 <+170>:	cmp    DWORD PTR [ebp-0x4],0xa0
-   0x08048c49 <+177>:	je     0x8048c8f <phase_3+247>
-   0x08048c4b <+179>:	call   0x80494fc <explode_bomb>
-   0x08048c50 <+184>:	jmp    0x8048c8f <phase_3+247>
+   0x08048c42 <+170>:  cmp    DWORD PTR [ebp-0x4],0xa0
+   0x08048c49 <+177>:  je     0x8048c8f <phase_3+247>
+   0x08048c4b <+179>:  call   0x80494fc <explode_bomb>
+   0x08048c50 <+184>:  jmp    0x8048c8f <phase_3+247>
    ; case 5: bl = 't'
-   0x08048c52 <+186>:	mov    bl,0x74
+   0x08048c52 <+186>:  mov    bl,0x74
    ; if (b == 458)
-   0x08048c54 <+188>:	cmp    DWORD PTR [ebp-0x4],0x1ca
-   0x08048c5b <+195>:	je     0x8048c8f <phase_3+247>
-   0x08048c5d <+197>:	call   0x80494fc <explode_bomb>
-   0x08048c62 <+202>:	jmp    0x8048c8f <phase_3+247>
+   0x08048c54 <+188>:  cmp    DWORD PTR [ebp-0x4],0x1ca
+   0x08048c5b <+195>:  je     0x8048c8f <phase_3+247>
+   0x08048c5d <+197>:  call   0x80494fc <explode_bomb>
+   0x08048c62 <+202>:  jmp    0x8048c8f <phase_3+247>
    ; case 6: bl = 'v'
-   0x08048c64 <+204>:	mov    bl,0x76
+   0x08048c64 <+204>:  mov    bl,0x76
    ; if (b == 780)
-   0x08048c66 <+206>:	cmp    DWORD PTR [ebp-0x4],0x30c
-   0x08048c6d <+213>:	je     0x8048c8f <phase_3+247>
-   0x08048c6f <+215>:	call   0x80494fc <explode_bomb>
-   0x08048c74 <+220>:	jmp    0x8048c8f <phase_3+247>
+   0x08048c66 <+206>:  cmp    DWORD PTR [ebp-0x4],0x30c
+   0x08048c6d <+213>:  je     0x8048c8f <phase_3+247>
+   0x08048c6f <+215>:  call   0x80494fc <explode_bomb>
+   0x08048c74 <+220>:  jmp    0x8048c8f <phase_3+247>
    ; case 7: bl = '{'
-   0x08048c76 <+222>:	mov    bl,0x62
+   0x08048c76 <+222>:  mov    bl,0x62
    ; if (b == 524)
-   0x08048c78 <+224>:	cmp    DWORD PTR [ebp-0x4],0x20c
-   0x08048c7f <+231>:	je     0x8048c8f <phase_3+247>
-   0x08048c81 <+233>:	call   0x80494fc <explode_bomb>
-   0x08048c86 <+238>:	jmp    0x8048c8f <phase_3+247>
+   0x08048c78 <+224>:  cmp    DWORD PTR [ebp-0x4],0x20c
+   0x08048c7f <+231>:  je     0x8048c8f <phase_3+247>
+   0x08048c81 <+233>:  call   0x80494fc <explode_bomb>
+   0x08048c86 <+238>:  jmp    0x8048c8f <phase_3+247>
    ; default
-   0x08048c88 <+240>:	mov    bl,0x78
-   0x08048c8a <+242>:	call   0x80494fc <explode_bomb>
-   0x08048c8f <+247>:	cmp    bl,BYTE PTR [ebp-0x5]
+   0x08048c88 <+240>:  mov    bl,0x78
+   0x08048c8a <+242>:  call   0x80494fc <explode_bomb>
+   0x08048c8f <+247>:  cmp    bl,BYTE PTR [ebp-0x5]
    ; bl == c
-   0x08048c92 <+250>:	je     0x8048c99 <phase_3+257>
-   0x08048c94 <+252>:	call   0x80494fc <explode_bomb>
-   0x08048c99 <+257>:	mov    ebx,DWORD PTR [ebp-0x18]
-   0x08048c9c <+260>:	mov    esp,ebp
-   0x08048c9e <+262>:	pop    ebp
-   0x08048c9f <+263>:	ret
+   0x08048c92 <+250>:  je     0x8048c99 <phase_3+257>
+   0x08048c94 <+252>:  call   0x80494fc <explode_bomb>
+   0x08048c99 <+257>:  mov    ebx,DWORD PTR [ebp-0x18]
+   0x08048c9c <+260>:  mov    esp,ebp
+   0x08048c9e <+262>:  pop    ebp
+   0x08048c9f <+263>:  ret
 ```
 
 ```assembly
 (gdb) x/s 0x80497de
-0x80497de:	 "%d %c %d"
+0x80497de:   "%d %c %d"
 ```
 
 ```assembly
 (gdb) x/8xw 0x80497e8
-0x80497e8:	0x08048be0	0x08048c00	0x08048c16	0x08048c28
-0x80497f8:	0x08048c40	0x08048c52	0x08048c64	0x08048c76
+0x80497e8:  0x08048be0  0x08048c00  0x08048c16  0x08048c28
+0x80497f8:  0x08048c40  0x08048c52  0x08048c64  0x08048c76
 ```
 ## phase 4
 
@@ -262,12 +367,12 @@ In `phase_4` an integer is read from the input string passed to `func4`.
 ```assembly
 (gdb) disas phase_4
 Dump of assembler code for function phase_4:
-   0x08048ce0 <+0>:	  push   ebp
-   0x08048ce1 <+1>:	  mov    ebp,esp
-   0x08048ce3 <+3>:	  sub    esp,0x18
+   0x08048ce0 <+0>:  push   ebp
+   0x08048ce1 <+1>:  mov    ebp,esp
+   0x08048ce3 <+3>:  sub    esp,0x18
    ; load arg int edx
-   0x08048ce6 <+6>:	  mov    edx,DWORD PTR [ebp+0x8]
-   0x08048ce9 <+9>:	  add    esp,0xfffffffc
+   0x08048ce6 <+6>:  mov    edx,DWORD PTR [ebp+0x8]
+   0x08048ce9 <+9>:  add    esp,0xfffffffc
    ; int a
    0x08048cec <+12>:  lea    eax,[ebp-0x4]
    0x08048cef <+15>:  push   eax
@@ -299,16 +404,16 @@ Dump of assembler code for function phase_4:
 
 `func4` calculates the Fibonacci sum of first `n` elements considering 0 as the 0th element where `n` is its argument.
 
-```assembler
+```assembly
 (gdb) disas func4
 Dump of assembler code for function func4:
-   0x08048ca0 <+0>:	  push   ebp
-   0x08048ca1 <+1>:	  mov    ebp,esp
-   0x08048ca3 <+3>:	  sub    esp,0x10
-   0x08048ca6 <+6>:	  push   esi
-   0x08048ca7 <+7>:	  push   ebx
+   0x08048ca0 <+0>:  push   ebp
+   0x08048ca1 <+1>:  mov    ebp,esp
+   0x08048ca3 <+3>:  sub    esp,0x10
+   0x08048ca6 <+6>:  push   esi
+   0x08048ca7 <+7>:  push   ebx
    ; load arg into ebx, lets call it variable a
-   0x08048ca8 <+8>:	  mov    ebx,DWORD PTR [ebp+0x8]
+   0x08048ca8 <+8>:  mov    ebx,DWORD PTR [ebp+0x8]
    ; if (a <= 1) return 1
    0x08048cab <+11>:  cmp    ebx,0x1
    0x08048cae <+14>:  jle    0x8048cd0 <func4+48>
@@ -348,13 +453,13 @@ The returned sum is compared with 55. Fibonacci sum of first nine numbers in the
 ```assembly
 (gdb) disas phase_5
 Dump of assembler code for function phase_5:
-   0x08048d2c <+0>:	  push   ebp
-   0x08048d2d <+1>:	  mov    ebp,esp
-   0x08048d2f <+3>:	  sub    esp,0x10
-   0x08048d32 <+6>:	  push   esi
-   0x08048d33 <+7>:	  push   ebx
+   0x08048d2c <+0>:  push   ebp
+   0x08048d2d <+1>:  mov    ebp,esp
+   0x08048d2f <+3>:  sub    esp,0x10
+   0x08048d32 <+6>:  push   esi
+   0x08048d33 <+7>:  push   ebx
    ; load arg into ebx
-   0x08048d34 <+8>:	  mov    ebx,DWORD PTR [ebp+0x8]
+   0x08048d34 <+8>:  mov    ebx,DWORD PTR [ebp+0x8]
    0x08048d37 <+11>:  add    esp,0xfffffff4
    ; find the length of input string
    0x08048d3a <+14>:  push   ebx
@@ -388,25 +493,25 @@ Dump of assembler code for function phase_5:
    0x08048d6b <+63>:  mov    BYTE PTR [ebp-0x2],0x0
    0x08048d6f <+67>:  add    esp,0xfffffff8
    ; compare the local array of characters with string "giants"
-   0x08048d72 <+70>:  push   0x804980b
-   0x08048d77 <+75>:  lea    eax,[ebp-0x8]
-   0x08048d7a <+78>:  push   eax
-   0x08048d7b <+79>:  call   0x8049030 <strings_not_equal>
-   0x08048d80 <+84>:  add    esp,0x10
-   0x08048d83 <+87>:  test   eax,eax
-   0x08048d85 <+89>:  je     0x8048d8c <phase_5+96>
-   0x08048d87 <+91>:  call   0x80494fc <explode_bomb>
-   0x08048d8c <+96>:  lea    esp,[ebp-0x18]
-   0x08048d8f <+99>:  pop    ebx
-   0x08048d90 <+100>: pop    esi
-   0x08048d91 <+101>: mov    esp,ebp
-   0x08048d93 <+103>: pop    ebp
-   0x08048d94 <+104>: ret
+   0x08048d72 <+70>:   push   0x804980b
+   0x08048d77 <+75>:   lea    eax,[ebp-0x8]
+   0x08048d7a <+78>:   push   eax
+   0x08048d7b <+79>:   call   0x8049030 <strings_not_equal>
+   0x08048d80 <+84>:   add    esp,0x10
+   0x08048d83 <+87>:   test   eax,eax
+   0x08048d85 <+89>:   je     0x8048d8c <phase_5+96>
+   0x08048d87 <+91>:   call   0x80494fc <explode_bomb>
+   0x08048d8c <+96>:   lea    esp,[ebp-0x18]
+   0x08048d8f <+99>:   pop    ebx
+   0x08048d90 <+100>:  pop    esi
+   0x08048d91 <+101>:  mov    esp,ebp
+   0x08048d93 <+103>:  pop    ebp
+   0x08048d94 <+104>:  ret
 ```
 The readonly string at location `0x804b220` is:
 
 ```assembly
-0x804b220 <array.123>:	 "isrveawhobpnutfg\260\001"
+0x804b220 <array.123>:   "isrveawhobpnutfg\260\001"
 (gdb) x/s 0x804980b
 ```
 The offsets in this string, for each of the letters in "giants" are:
