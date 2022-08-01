@@ -537,4 +537,4 @@ I will not document the last two phases and leave them as an exercise.The hint f
 
 ## secret phase
 
-Yes it exists, right alongside phase 4 and your hint is: Behave!
+Yes it exists, right alongside phase 4 and your hint is: "Oh behave!"
