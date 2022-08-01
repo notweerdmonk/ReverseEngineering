@@ -11,7 +11,7 @@ Now armed with linux, bash and the ever amazing gdb, we set out to defuse this b
 $ file bomb
 bomb: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically linked (uses shared libs), for GNU/Linux 2.0.0, not stripped
 ```
-he easiest way is to use a virtual machine emulator/hypervisor like qemu, VirtualBox, vagrant or whatever other virtual machine feels sane. Next you need a 32-bit Linux distro (you can also do this on a Windows or Mac machine, look around the internet). Make sure to have atleast the common Unix tools like file, strings, gdb, etc installed before you proceed. This task helped me learn about gdb in an entirely new light.
+The easiest way is to use a virtual machine emulator/hypervisor like qemu, VirtualBox, vagrant or whatever other virtual machine feels sane. Next you need a 32-bit Linux distro (you can also do this on a Windows or Mac machine, look around the internet). Make sure to have atleast the common Unix tools like file, strings, gdb, etc installed before you proceed. This task helped me learn about gdb in an entirely new light.
 
 Load the binary with gdb and set a breakpoint at `main`.
 
@@ -136,7 +136,7 @@ Dump of assembler code for function phase_1:
    0x08048b45 <+37>:  pop    ebp
    0x08048b46 <+38>:  ret    
 ```
-It is not entirely necessary to analyze `strings_not_equal` at this point. Knowledge of the x86 32-bit C calling convention is required before you proceed to understand how arguments are passed and functions get called. Look up this [document](https://github.com/uva-cs/pdr/blob/master/book/x86-32bit-ccc-chapter.pdf) or search the internet. After you have understood the calling convention it is easy to understand that there are two arguments to this function which are being pushed to the stack. The first one is the input string and the second is a readonly string in the data section. The string comparision function will return 0 if two strings match exactly else it will return 1.
+It is not entirely necessary to analyze `strings_not_equal` at this point. Knowledge of the x86 32-bit C calling convention is required before you proceed to understand how arguments are passed and functions get called. Look up this [document](https://github.com/uva-cs/pdr/blob/master/book/x86-32bit-ccc-chapter.pdf) or search the internet. After you have understood the calling convention it is easy to understand that there are two arguments to this function which are being pushed to the stack. The first one is the input string and the second is a read-only string in the data section. The string comparision function will return 0 if two strings match exactly else it will return 1.
 
 ```assembly
 Dump of assembler code for function strings_not_equal:
@@ -233,7 +233,7 @@ Starting with 1, the six numbers in the sequence are 1, 2, 6, 24, 120, 720.
 
 ## phase 3
 
-Two ```int``` and a ```char``` are extracted from the input string. Let's use literals ```a``` and ```b``` for the two integers, and ```c``` for the character. ```a``` is used in a switch block consisting of eight cases for each value starting with 0 till 7. The case blocks load a 8-bit constant value into ```bl``` (ebx) which will be compared against ```c```. And then there are checks comparing ```b``` with constant integer values.
+Two ```int``` and a ```char``` are extracted from the input string. Let's use literals ```a``` and ```b``` for the two integers, and ```c``` for the character. ```a``` is used in a switch block consisting of eight cases for each value starting with 0 till 7. The case blocks load a 8-bit constant value into ```bl``` (lowest byte of ebx) which will be compared against ```c```. And then there are checks comparing ```b``` with constant integer values.
 
 We need to set ```a``` to any number from 0 to 7, but ```c``` and ```b``` shoulde be set such that the checks in corresponding case blocks pass. Possible values are:
 
@@ -508,7 +508,7 @@ Dump of assembler code for function phase_5:
    0x08048d93 <+103>:  pop    ebp
    0x08048d94 <+104>:  ret
 ```
-The readonly string at location `0x804b220` is:
+The read-only string at location `0x804b220` is:
 
 ```assembly
 0x804b220 <array.123>:   "isrveawhobpnutfg\260\001"
