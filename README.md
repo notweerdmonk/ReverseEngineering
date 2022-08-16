@@ -1,5 +1,1 @@
-# Branches
-
-- [Bomb Lab](https://github.com/notweerdmonk/ReverseEngineering/tree/bomb_lab)
-
-:)
+# Write-ups for crackmes from [crackmes.one](https://crackmes.one/).
