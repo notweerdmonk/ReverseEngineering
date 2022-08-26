@@ -98,6 +98,6 @@ Contents of section .data:
 
 We find that there is a string "P455w0rd" at the memory location along with other strings. When this data is loaded into `eax`, it contains only the first four characters "P455".
 
-Looking at the disassembly, The value at memory location loaded in `ebx` is compared to `eax`. As `ebx` contains the address of argv[1], the argument passed to the program is being compared with "P455". If both are equal then control jumps to `_start.goodjob`, prints "You Got This!" by calling write system call and then calls exit system call.
+Looking at the disassembly, The value at memory location loaded in `ebx` is compared to `eax`. As `ebx` contains argv[1] which is a pointer to the string passed as command line argument to the program, the string is being compared with "P455". If both are equal then control jumps to `_start.goodjob`, prints "You Got This!" by calling write system call and then calls exit system call.
 
 Therefore providing any string starting with "P455" is acceptable.
