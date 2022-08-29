@@ -1,12 +1,12 @@
 EZ crackme
 ==========
 
-This a is very easy crackme.
+This is a very easy crackme.
 
 Running the binary without arguments results in a crash due to segmentation fault. Using any string as argument prints "Wrong".
 
 ```bash
-$ ./run.ext aaaaaa
+$ ./run.exe aaaaaa
 Wrong!
 $
 ```
@@ -41,7 +41,7 @@ Idx Name          Size      VMA       LMA       File off  Algn
 Checking the contents of .debug_info
 
 ```bash
-$ objdump -s -j .debug_info run.ext
+$ objdump -s -j .debug_info run.exe
 Contents of section .debug_info:
  0000 36000000 02000000 00000401 00900408  6...............
  0010 45900408 00000000 636f6465 2e61736d  E.......code.asm
