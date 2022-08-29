@@ -1,7 +1,7 @@
 EZ crackme
 ==========
 
-This is very easy crackme.
+This a is very easy crackme.
 
 Running the binary without arguments results in a crash due to segmentation fault. Using any string as argument prints "Wrong".
 
