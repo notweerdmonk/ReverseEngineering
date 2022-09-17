@@ -1,9 +1,8 @@
-EZ crackme
-==========
+# EZ crackme
 
-This is a very easy crackme.
+[crackmes.one - EZ crackme](https://crackmes.one/crackme/5fcfb87933c5d424269a1afc)
 
-Running the binary without arguments results in a crash due to segmentation fault. Using any string as argument prints "Wrong".
+This is a very easy crackme. Running the binary without arguments results in a crash due to segmentation fault. Using any string as argument prints "Wrong".
 
 ```bash
 $ ./run.exe aaaaaa
